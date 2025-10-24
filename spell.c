@@ -39,12 +39,31 @@ char *dictionary(const char *path){
 }
 
 int main(int argc, char **argv){
-   
     char *dict = dictionary(argv[1]);
 
     printf("Dictionary:\n%s\n", dict);
 
+    int fd = STDIN_FILENO;
+
+    char buf[100];
+    int bytes;
+
+    while ((bytes = read(STDIN_FILENO, buf, 99)) > 0) {
+        buf[bytes] = '\0';
+
+        char *newline = strchr(buf, '\n');
+        if (newline)
+            *newline = '\0';
+
+        if (strstr(dict, buf)) {
+            printf("Correctly spelled word: %s\n", buf);
+        } else {
+            printf("Misspelled word: %s\n", buf);
+        }
+    }
     
+    free(dict);
+    close(fd);
 
     return EXIT_SUCCESS;
 }
