@@ -5,7 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define BUFSIZE 100000
+#define TOTAL_WORDS 100000
 
 char *dictionary(const char *path){
     int fd = open(path, O_RDONLY);
@@ -15,14 +15,14 @@ char *dictionary(const char *path){
         exit(EXIT_FAILURE);
     }
 
-    char *buf = malloc(BUFSIZE + 1);
+    char *buf = malloc(TOTAL_WORDS + 1);
     if(!buf){
         perror("Error malloc");
         close(fd);
         exit(EXIT_FAILURE);
     }
 
-    int bytes = read(fd, buf, BUFSIZE);
+    int bytes = read(fd, buf, TOTAL_WORDS);
 
     if(bytes < 0){
         perror("Error read");
@@ -32,38 +32,37 @@ char *dictionary(const char *path){
     }
 
     buf[bytes] = '\0';
-
     close(fd);
 
     return buf;
 }
 
+int buff_to_array(char *buf, char *dict[]){
+    int numb_words = 0;
+    char *token = strtok(buf, "\n");
+
+    while(token && numb_words < TOTAL_WORDS){
+        dict[numb_words++] = token;
+        token = strtok(NULL, "\n");
+    }
+
+    return numb_words; 
+}
+
 int main(int argc, char **argv){
     char *dict = dictionary(argv[1]);
 
-    printf("Dictionary:\n%s\n", dict);
+    printf("Dictionary as buffer:\n%s\n", dict);
 
-    int fd = STDIN_FILENO;
+    char *dictionary_array[TOTAL_WORDS];
+    int a = buff_to_array(dict, dictionary_array);
 
-    char buf[100];
-    int bytes;
-
-    while ((bytes = read(STDIN_FILENO, buf, 99)) > 0) {
-        buf[bytes] = '\0';
-
-        char *newline = strchr(buf, '\n');
-        if (newline)
-            *newline = '\0';
-
-        if (strstr(dict, buf)) {
-            printf("Correctly spelled word: %s\n", buf);
-        } else {
-            printf("Misspelled word: %s\n", buf);
-        }
+    printf("Dictionary as array:\n");
+    for(int i = 0; i < a; i++){
+        printf("%s\n", dictionary_array[i]);
     }
     
     free(dict);
-    close(fd);
 
     return EXIT_SUCCESS;
 }
