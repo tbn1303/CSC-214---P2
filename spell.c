@@ -5,7 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define TOTAL_WORDS 100000
+#define TOTAL_WORDS 1000000
 
 char *dictionary(const char *path){
     int fd = open(path, O_RDONLY);
@@ -46,23 +46,67 @@ int buff_to_array(char *buf, char *dict[]){
         token = strtok(NULL, "\n");
     }
 
-    return numb_words; 
+    return numb_words;
 }
+
+int handling_capital(const char *word, const char *word_in_dict){
+    if(isupper(word_in_dict[0])){
+        if(isupper(word[0])){
+            return (strcasecmp(word, word_in_dict) == 0);
+        }
+
+        return 0;
+    }
+
+    return (strcasecmp(word, word_in_dict) == 0);
+}
+
+int check_word(const char *word, char *dict[], int numb){
+    for(int i = 0; i < numb; i++){
+        if(handling_capital(word, dict[i])){
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+
 
 int main(int argc, char **argv){
     char *dict = dictionary(argv[1]);
 
-    printf("Dictionary as buffer:\n%s\n", dict);
+    //printf("Dictionary as buffer:\n%s\n", dict);
 
     char *dictionary_array[TOTAL_WORDS];
-    int a = buff_to_array(dict, dictionary_array);
+    int numb_words = buff_to_array(dict, dictionary_array);
 
-    printf("Dictionary as array:\n");
-    for(int i = 0; i < a; i++){
+    /*printf("Dictionary as array:\n");
+    for(int i = 0; i < numb_words; i++){
         printf("%s\n", dictionary_array[i]);
+    }*/
+
+    int fd = STDIN_FILENO;
+    char *buf = malloc(256);
+    int found;
+
+    int bytes;
+    while((bytes = read(fd, buf, 255)) > 0){
+        buf[bytes - 1] = '\0';
+
+        found = check_word(buf, dictionary_array, numb_words);
+
+        if(found){
+            printf("Word found in dictionary.\n");
+        } 
+
+        else{
+            printf("Word not found in dictionary.\n");
+    }
     }
     
     free(dict);
+    free(buf);
 
     return EXIT_SUCCESS;
 }
