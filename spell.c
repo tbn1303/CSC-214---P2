@@ -71,7 +71,33 @@ int check_word(const char *word, char *dict[], int numb){
     return 0;
 }
 
+int check_word_file(const char *path){
+    int fd = open(path, O_RDONLY);
 
+    if(fd < 0){
+        perror("Error open");
+        return 0;
+    }
+
+    int bytes;
+    char buf[256];
+    
+    while((bytes = read(fd, buf, 255)) > 0){
+        if(buf[bytes - 1] == '\n' || buf[bytes - 1] == '\r' || buf[bytes - 1] == ' '){
+            buf[bytes - 1] = '\0';
+        }
+
+        for(int i = 0; i < bytes; i++){
+            if(!isalpha(buf[i])){
+                buf[i++] = buf[i + 1];
+                bytes--;
+            }
+        }
+    }
+
+    close(fd);
+    return 1;
+}
 
 int main(int argc, char **argv){
     char *dict = dictionary(argv[1]);
@@ -102,7 +128,7 @@ int main(int argc, char **argv){
 
         else{
             printf("Word not found in dictionary.\n");
-    }
+        }
     }
     
     free(dict);
