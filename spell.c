@@ -141,13 +141,27 @@ int check_valid_word(const char *word){
     return 0;
 }
 
-void clean_word(const char *src, const char *dest){  
+void clean_word(const char *src, char *dest){  
     int start = 0;
     int end = strlen(src) - 1;
 
     while(start <= end && strchr("{[\"'", src[start]) != NULL){
         start++;
     }
+
+    while(end >= start && !isalnum(src[end])){
+        end--;
+    }
+
+    if(start > end){
+        dest[0] = '\0';
+        return;
+    }
+
+    int len = end - start + 1;
+    memcpy(dest, src + start, len);
+    dest[len] = '\0';
+
 }
 
 int word_match_in_dict(const char *word, char *dict[], int numb_words){
