@@ -7,36 +7,36 @@
 
 #define TOTAL_WORDS 1000000
 #define BUFSIZE 256
+#define WORDLEN 128
 
-typedef struct {
+typedef struct{
     char *buf;
     int fd;
     int pos;
     int bytes;
-} LINES;
+}LINES;
 
-void lines_init (LINES *l, int fd){
+void lines_init(LINES *l, int fd){
     l->buf = malloc(BUFSIZE);
     l->pos = 0;
     l->bytes = 0;
     l->fd = fd;
 }
 
-void
-lines_destroy (LINES *l){
+void lines_destroy(LINES *l){
     free(l->buf);
 }
 
-char *lines_next (LINES *l){
+char *lines_next(LINES *l){
     char *line = NULL;
     int linelen = 0;
 
-    if (l->bytes < 0) return NULL;
+    if(l->bytes < 0) return NULL;
 
-    do {
+    do{
         int segstart = l->pos;
-        while (l->pos < l->bytes) {
-            if (l->buf[l->pos] == '\n') {
+        while(l->pos < l->bytes){
+            if(l->buf[l->pos] == '\n'){
                 int seglen = l->pos - segstart;
                 //if (DEBUG) printf("[%d/%d/%d found newline %d+%d]\n", segstart, l->pos, l->bytes, linelen, seglen);
                 line = realloc(line, linelen + seglen + 1);
@@ -62,7 +62,7 @@ char *lines_next (LINES *l){
         l->pos = 0;
         l->bytes = read(l->fd, l->buf, BUFSIZE);
         //if (DEBUG) printf("[got %d bytes]\n", l->bytes);
-    } while (l->bytes > 0);
+    }while (l->bytes > 0);
 
     l->bytes = -1;
 
@@ -111,13 +111,12 @@ int buff_to_array(char *buf, char *dict[]){
     return numb_words;
 }
 
-int check_word(const char *word){
+int check_valid_word(const char *word){
     for(int i = 0; word[i] != '\0'; i++){
         if(isalpha(word[i])){
             return 1;
         }
     }
-
     return 0;
 }
 
@@ -153,24 +152,42 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
 
     LINES lines;
     lines_init(&lines, fd);
-    int bytes;
-    char buf[256];
-    
-    while((bytes = read(fd, buf, 255)) > 0){
-        if(buf[bytes - 1] == '\n' || buf[bytes - 1] == '\r' || buf[bytes - 1] == ' '){
-            buf[bytes - 1] = '\0';
-        }
+    char *line;
+    int error_count = 0;
+    int line_number = 1;
 
-        for(int i = 0; i < bytes; i++){
-            if(!isalpha(buf[i])){
-                buf[i++] = buf[i + 1];
-                bytes--;
+    while(line = lines_next(&lines)){
+        int col = 1;
+        int i = 0;
+        char word[WORDLEN];
+
+        for(int pos = 0; line[pos]; pos++){
+            if(isalpha(line[pos]) || line[pos] == '-' || line[pos] == '_'){
+                if(i < WORDLEN - 1){
+                    word[i++] = line[pos];
+                }
+            }
+
+            else if(i > 0){
+                word[i] = '\0';
+
+                if(check_valid_word(word)){
+                    if(!word_match_in_dict(word, dict, numb_words)){
+                        printf("%s:%d:%d %s\n", path, line_number, col - i, word);
+                        error_count++;
+                    }
+                }
+
+                i = 0;
             }
         }
+
+        free(line);
+        line_number++;
     }
 
-    close(fd);
-    return 1;
+    lines_destroy(&lines);
+    return error_count;
 }
 
 int main(int argc, char **argv){
@@ -205,7 +222,6 @@ int main(int argc, char **argv){
         }
     }
     
-    free(dict);
     free(buf);
 
     return EXIT_SUCCESS;
