@@ -141,16 +141,13 @@ int check_valid_word(const char *word){
     return 0;
 }
 
-int handling_capital(const char *word, const char *word_in_dict){
-    if(isupper(word_in_dict[0])){
-        if(isupper(word[0])){
-            return (strcasecmp(word, word_in_dict) == 0);
-        }
+void clean_word(const char *src, const char *dest){  
+    int start = 0;
+    int end = strlen(src) - 1;
 
-        return 0;
+    while(start <= end && strchr("{[\"'", src[start]) != NULL){
+        start++;
     }
-
-    return (strcasecmp(word, word_in_dict) == 0);
 }
 
 int word_match_in_dict(const char *word, char *dict[], int numb_words){
