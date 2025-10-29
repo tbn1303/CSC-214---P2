@@ -237,8 +237,8 @@ int main(int argc, char **argv){
     int found;
 
     int bytes;
-    while((bytes = read(fd, buf, 255)) > 0){
-        buf[bytes] = '\0';
+    while((bytes = read(fd, buf, 256)) > 0){
+        buf[bytes - 1] = '\0';
 
         found = word_match_in_dict(buf, dictionary_array, numb_words);
 
