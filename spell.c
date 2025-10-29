@@ -194,7 +194,7 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
 }
 
 int main(int argc, char **argv){
-    char *dict = dictionary(argv[1]);
+    char *dict = dictionary(argv[1]);                  // need argument validation checking like "argc < 2" otherwise potential segfault
 
     //printf("Dictionary as buffer:\n%s\n", dict);
 

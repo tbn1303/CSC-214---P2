@@ -2,7 +2,7 @@ Authors: Thai Nguyen & Zachary Adam
 
 Overall review of current code: 
 
-- fix sized memory allocation for the dictionary should also be renamed
+- fix sized memory allocation for the dictionary + should also be renamed
 - does linear search on the dictionary instead of binary search which could be slow for large dictionaries
 - the logic for capitilization rules must be fixed
 - column tracking and partial word parsing issues
