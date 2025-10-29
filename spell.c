@@ -5,9 +5,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#define TOTAL_WORDS 1000000
-#define BUFSIZE 256
-#define WORDLEN 128
+#define TOTAL_WORDS 1000000  // this is 1000000 bytes not a 1000000 words 
+#define BUFSIZE 256 
+#define WORDLEN 128          // if dictionary lines exceed wordlen than truncation or buffer overflow will occur
 
 typedef struct{
     char *buf;
@@ -15,6 +15,8 @@ typedef struct{
     int pos;
     int bytes;
 }LINES;
+
+/* line reader logic is here but not used so streaming is not present everything is checked in RAM inefficient*/
 
 void lines_init(LINES *l, int fd){
     l->buf = malloc(BUFSIZE);
@@ -29,7 +31,8 @@ void lines_destroy(LINES *l){
 
 char *lines_next(LINES *l){
     char *line = NULL;
-    int linelen = 0;
+    int linelen = 0;                    //if lines_next returns NULL it will leave a dangling buffer because free() is in check_words_in_file
+                                        // should be freed on exit or before returning NULL
 
     if(l->bytes < 0) return NULL;
 
@@ -101,7 +104,7 @@ char *dictionary(const char *path){
 
 int buff_to_array(char *buf, char *dict[]){
     int numb_words = 0;
-    char *token = strtok(buf, "\n");
+    char *token = strtok(buf, "\n");                //this makes the buffer unsafe for reuse by inserting /0 terminators in it
 
     while(token && numb_words < TOTAL_WORDS){
         dict[numb_words++] = token;
@@ -133,7 +136,7 @@ int handling_capital(const char *word, const char *word_in_dict){
 }
 
 int word_match_in_dict(const char *word, char *dict[], int numb_words){
-    for(int i = 0; i < numb_words; i++){
+    for(int i = 0; i < numb_words; i++){                                    // does linear search through dictionary instead of binary search
         if(handling_capital(word, dict[i])){
             return 1;
         }
@@ -157,7 +160,7 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
     int line_number = 1;
 
     while(line = lines_next(&lines)){
-        int col = 1;
+        int col = 1;                            //col is never incremented?
         int i = 0;
         char word[WORDLEN];
 
@@ -182,7 +185,7 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
             }
         }
 
-        free(line);
+        free(line);                         //free should be called outside of exit 
         line_number++;
     }
 
