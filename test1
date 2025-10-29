@@ -1,28 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <dirent.h>
+#include <unistd.h>
+#include <string.h>
 #include <ctype.h>
-#include <sys/stat.h>
 
-#define MAX_WORDS 100000
-#define MAX_DICT_SIZE 1000000
-#define WORD_LEN 128
-#define PATH_LEN 1024
+#define TOTAL_WORDS 100000
 #define BUFSIZE 256
+#define WORDLEN 128
 
-char *suffix = ".txt";
-
-// -------------------- LINES STRUCT --------------------
 typedef struct {
     char *buf;
+    int fd;
     int pos;
     int bytes;
-    int fd;
 } LINES;
 
+// Initialize LINES structure
 void lines_init(LINES *l, int fd) {
     l->buf = malloc(BUFSIZE);
     l->pos = 0;
@@ -30,16 +24,17 @@ void lines_init(LINES *l, int fd) {
     l->fd = fd;
 }
 
+// Destroy LINES structure
 void lines_destroy(LINES *l) {
     free(l->buf);
 }
 
+// Read next line using read()
 char *lines_next(LINES *l) {
     char *line = NULL;
     int linelen = 0;
 
-    if (l->bytes < 0)
-        return NULL;
+    if (l->bytes < 0) return NULL;
 
     do {
         int segstart = l->pos;
@@ -54,7 +49,6 @@ char *lines_next(LINES *l) {
             }
             l->pos++;
         }
-
         if (segstart < l->pos) {
             int seglen = l->pos - segstart;
             line = realloc(line, linelen + seglen + 1);
@@ -62,7 +56,6 @@ char *lines_next(LINES *l) {
             linelen += seglen;
             line[linelen] = '\0';
         }
-
         l->pos = 0;
         l->bytes = read(l->fd, l->buf, BUFSIZE);
     } while (l->bytes > 0);
@@ -71,246 +64,175 @@ char *lines_next(LINES *l) {
     return line;
 }
 
-// -------------------- DICTIONARY --------------------
-char *load_dict(const char *path) {
+// Read dictionary into buffer
+char *dictionary(const char *path) {
     int fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        perror("open dictionary");
-        exit(EXIT_FAILURE);
-    }
+    if (fd < 0) { perror("Error opening dictionary"); exit(EXIT_FAILURE); }
 
-    char *buf = malloc(MAX_DICT_SIZE);
-    if (!buf) {
-        perror("malloc dictionary");
-        close(fd);
-        exit(EXIT_FAILURE);
-    }
+    char *buf = malloc(BUFSIZE);
+    if (!buf) { perror("malloc"); close(fd); exit(EXIT_FAILURE); }
 
-    ssize_t bytes = read(fd, buf, MAX_DICT_SIZE - 1);
-    if (bytes < 0) {
-        perror("read dictionary");
-        free(buf);
-        close(fd);
-        exit(EXIT_FAILURE);
+    int bytes, total = 0, size = BUFSIZE;
+    while ((bytes = read(fd, buf + total, size - total - 1)) > 0) {
+        total += bytes;
+        if (total >= size - 1) {
+            size *= 2;
+            char *tmp = realloc(buf, size);
+            if (!tmp) { perror("realloc"); free(buf); close(fd); exit(EXIT_FAILURE); }
+            buf = tmp;
+        }
     }
+    if (bytes < 0) { perror("read"); free(buf); close(fd); exit(EXIT_FAILURE); }
 
-    buf[bytes] = '\0';
+    buf[total] = '\0';
     close(fd);
     return buf;
 }
 
-int split_dict(char *buf, char *dict[]) {
-    int n = 0;
-    char *tok = strtok(buf, "\n");
-    while (tok && n < MAX_WORDS) {
-        dict[n++] = tok;
-        tok = strtok(NULL, "\n");
+// Convert dictionary buffer to array
+int buff_to_array(char *buf, char *dict[]) {
+    int numb_words = 0;
+    char *token = strtok(buf, "\n");
+    while (token && numb_words < TOTAL_WORDS) {
+        dict[numb_words++] = token;
+        token = strtok(NULL, "\n");
     }
-    return n;
+    return numb_words;
 }
 
-// -------------------- MATCHING RULES --------------------
-int match_word(const char *input, const char *dict_word) {
-    int has_upper = 0;
-    for (int i = 0; dict_word[i]; i++) {
+// Compare function for sorting
+int cmp(const void *a, const void *b) {
+    return strcasecmp(*(const char **)a, *(const char **)b);
+}
+
+// Trim leading brackets and trailing symbols into a separate buffer
+void trim_word_copy(const char *src, char *dest) {
+    int start = 0, end = strlen(src) - 1;
+
+    while (start <= end && strchr("([{\"'", src[start]) != NULL) start++;
+    while (end >= start && !isalnum(src[end])) end--;
+
+    if (start > end) { dest[0] = '\0'; return; }
+
+    int len = end - start + 1;
+    memcpy(dest, src + start, len);
+    dest[len] = '\0';
+}
+
+// Check word has at least one letter
+int is_valid_word(const char *word) {
+    for (int i = 0; word[i]; i++)
+        if (isalpha(word[i])) return 1;
+    return 0;
+}
+
+// Full capitalization match
+int match_word_fullcase(const char *word, const char *dict_word) {
+    int len_w = strlen(word);
+    int len_d = strlen(dict_word);
+    if (len_w != len_d) return 0;
+
+    for (int i = 0; i < len_d; i++) {
         if (isupper(dict_word[i])) {
-            has_upper = 1;
-            break;
+            if (word[i] != dict_word[i]) return 0;
+        } else {
+            if (tolower(word[i]) != dict_word[i] && toupper(word[i]) != dict_word[i])
+                return 0;
         }
     }
-
-    if (!has_upper) {
-        // dictionary word all lowercase: accept any capitalization
-        return strcasecmp(input, dict_word) == 0;
-    }
-
-    // dictionary has uppercase letters: must match exactly or be all uppercase
-    if (strcmp(input, dict_word) == 0)
-        return 1;
-
-    int all_caps = 1;
-    for (int i = 0; input[i]; i++) {
-        if (isalpha(input[i]) && !isupper(input[i])) {
-            all_caps = 0;
-            break;
-        }
-    }
-
-    if (all_caps && strcasecmp(input, dict_word) == 0)
-        return 1;
-
-    return 0;
+    return 1;
 }
 
-int in_dict(const char *word, char *dict[], int n) {
-    for (int i = 0; i < n; i++)
-        if (match_word(word, dict[i]))
-            return 1;
-    return 0;
-}
-
-// -------------------- CHECK HELPERS --------------------
-int check_valid_word(const char *word) {
-    for (int i = 0; word[i]; i++) {
-        if (isalpha(word[i]))
-            return 1;
+// Binary search in dictionary
+int word_match_in_dict(const char *word, char *dict[], int numb_words) {
+    int low = 0, high = numb_words - 1;
+    while (low <= high) {
+        int mid = low + (high - low) / 2;
+        if (match_word_fullcase(word, dict[mid])) return 1;
+        if (strcasecmp(word, dict[mid]) < 0) high = mid - 1;
+        else low = mid + 1;
     }
     return 0;
 }
 
-// -------------------- CHECK FILE --------------------
-int check_fd(const char *path, int fd, char *dict[], int n) {
+// Check words in a file
+int check_word_in_file(const char *path, char *dict[], int numb_words) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) { perror(path); return 1; }
+
     LINES lines;
     lines_init(&lines, fd);
-
     char *line;
-    int line_num = 1;
-    int err = 0;
+    int error_count = 0;
+    int line_number = 1;
 
     while ((line = lines_next(&lines))) {
-        int col = 1;
-        int i = 0;
-        char word[WORD_LEN];
+        int col = 1, i = 0;
+        char word[WORDLEN];
 
         for (int pos = 0; line[pos]; pos++, col++) {
-            char ch = line[pos];
+            if (isalpha(line[pos]) || isdigit(line[pos]) || line[pos] == '-' || line[pos] == '_') {
+                if (i < WORDLEN - 1) word[i++] = line[pos];
+            } else if (i > 0) {
+                word[i] = '\0';
+                char trimmed[WORDLEN];
+                trim_word_copy(word, trimmed); // copy trimmed word for comparison
 
-            if (isspace(ch)) {
-                if (i > 0) {
-                    word[i] = '\0';
-                    int start = 0;
-                    while (word[start] && ispunct(word[start])) start++;
-                    int end = strlen(word) - 1;
-                    while (end >= start && ispunct(word[end])) end--;
-                    word[end + 1] = '\0';
-
-                    if (start <= end) {
-                        char *clean = word + start;
-                        if (check_valid_word(clean) && !in_dict(clean, dict, n)) {
-                            printf("%s:%d:%d %s\n", path, line_num, col - i, clean);
-                            err = 1;
-                        }
-                    }
-                    i = 0;
+                if (is_valid_word(trimmed) && !word_match_in_dict(trimmed, dict, numb_words)) {
+                    printf("%s:%d:%d %s\n", path, line_number, col - i, word);
+                    error_count++;
                 }
-            } else {
-                if (i < WORD_LEN - 1)
-                    word[i++] = ch;
+                i = 0;
             }
         }
 
-        // handle last word on line
-        if (i > 0) {
+        if (i > 0) { // last word in line
             word[i] = '\0';
-            int start = 0;
-            while (word[start] && ispunct(word[start])) start++;
-            int end = strlen(word) - 1;
-            while (end >= start && ispunct(word[end])) end--;
-            word[end + 1] = '\0';
+            char trimmed[WORDLEN];
+            trim_word_copy(word, trimmed);
 
-            if (start <= end) {
-                char *clean = word + start;
-                if (check_valid_word(clean) && !in_dict(clean, dict, n)) {
-                    printf("%s:%d:%d %s\n", path, line_num, col - i, clean);
-                    err = 1;
-                }
+            if (is_valid_word(trimmed) && !word_match_in_dict(trimmed, dict, numb_words)) {
+                printf("%s:%d:%d %s\n", path, line_number, col - i, word);
+                error_count++;
             }
         }
 
         free(line);
-        line_num++;
+        line_number++;
     }
 
     lines_destroy(&lines);
-    return err;
+    close(fd);
+    return error_count;
 }
 
-// -------------------- DIRECTORY RECURSION --------------------
-int has_suffix(const char *filename) {
-    size_t len = strlen(filename);
-    size_t suf_len = strlen(suffix);
-    return len >= suf_len && strcmp(filename + len - suf_len, suffix) == 0;
-}
-
-int check_dir(const char *dir, char *dict[], int n) {
-    DIR *d = opendir(dir);
-    if (!d) {
-        perror(dir);
-        return 1;
-    }
-
-    struct dirent *ent;
-    struct stat st;
-    char path[PATH_LEN];
-    int err = 0;
-
-    while ((ent = readdir(d))) {
-        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
-            continue;
-
-        snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
-        if (stat(path, &st) == -1)
-            continue;
-
-        if (S_ISDIR(st.st_mode))
-            err |= check_dir(path, dict, n);
-        else if (S_ISREG(st.st_mode) && has_suffix(ent->d_name)) {
-            int fd = open(path, O_RDONLY);
-            if (fd < 0) {
-                perror(path);
-                continue;
-            }
-            err |= check_fd(path, fd, dict, n);
-            close(fd);
-        }
-    }
-
-    closedir(d);
-    return err;
-}
-
-// -------------------- MAIN --------------------
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s [-s suffix] <dictionary> [file|directory]\n", argv[0]);
-        return EXIT_FAILURE;
-    }
+    if (argc < 2) { fprintf(stderr, "Usage: %s dictionary [files...]\n", argv[0]); return EXIT_FAILURE; }
 
-    int argi = 1;
-    if (argc > 2 && strcmp(argv[1], "-s") == 0) {
-        suffix = argv[2];
-        argi = 3;
-    }
+    char *dict_buf = dictionary(argv[1]);
+    char *dictionary_array[TOTAL_WORDS];
+    int numb_words = buff_to_array(dict_buf, dictionary_array);
+    qsort(dictionary_array, numb_words, sizeof(char*), cmp);
 
-    char *buf = load_dict(argv[argi]);
-    char *dict[MAX_WORDS];
-    int n = split_dict(buf, dict);
+    int errors = 0;
 
-    int err = 0;
-    if (argc <= argi + 1)
-        err = check_fd("stdin", STDIN_FILENO, dict, n);
-    else {
-        struct stat st;
-        if (stat(argv[argi + 1], &st) == -1) {
-            perror(argv[argi + 1]);
-            free(buf);
-            return EXIT_FAILURE;
-        }
+    if (argc == 2) { // read stdin
+        char word[WORDLEN];
+        while (scanf("%127s", word) == 1) {
+            char trimmed[WORDLEN];
+            trim_word_copy(word, trimmed);
 
-        if (S_ISDIR(st.st_mode))
-            err = check_dir(argv[argi + 1], dict, n);
-        else {
-            int fd = open(argv[argi + 1], O_RDONLY);
-            if (fd < 0) {
-                perror(argv[argi + 1]);
-                free(buf);
-                return EXIT_FAILURE;
+            if (is_valid_word(trimmed) && !word_match_in_dict(trimmed, dictionary_array, numb_words)) {
+                printf("stdin:1:1 %s\n", word);
+                errors++;
             }
-            err = check_fd(argv[argi + 1], fd, dict, n);
-            close(fd);
+        }
+    } else { // files from command line
+        for (int i = 2; i < argc; i++) {
+            errors += check_word_in_file(argv[i], dictionary_array, numb_words);
         }
     }
 
-    free(buf);
-    return err ? EXIT_FAILURE : EXIT_SUCCESS;
+    free(dict_buf);
+    return errors ? EXIT_FAILURE : EXIT_SUCCESS;
 }
