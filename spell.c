@@ -104,13 +104,13 @@ char *dictionary(const char *path){
             buf = temp_buf;
 
         }
+    }
 
-        if(bytes < 0){
-            perror("Error read");
-            free(buf);
-            close(fd);
-            exit(EXIT_FAILURE);
-        }
+    if(bytes < 0){
+        perror("Error read");
+        free(buf);
+        close(fd);
+        exit(EXIT_FAILURE);
     }
 
     buf[bytes] = '\0';
