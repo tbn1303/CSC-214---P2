@@ -84,20 +84,21 @@ char *dictionary(const char *path){
         exit(EXIT_FAILURE);
     }
 
-    int total = 0;
     int bytes;
+    int total = 0;
     int size = BUFSIZE;
 
-    while((bytes = read(fd, buf, BUFSIZE)) > 0){
+    while((bytes = read(fd, buf + total, size - total - 1)) > 0){
         total += bytes;
 
-        if(total >= BUFSIZE - 1){
+        if(total >= size - 1){
             size *= 2;
             char *temp_buf = realloc(buf, size);
 
-            if(temp_buf < 0){
+            if(temp_buf == NULL){
                 perror("Error realloc");
-                free(temp_buf);
+                free(buf);
+                close(fd);
                 exit(EXIT_FAILURE);
             }
 
@@ -113,7 +114,7 @@ char *dictionary(const char *path){
         exit(EXIT_FAILURE);
     }
 
-    buf[bytes] = '\0';
+    buf[total] = '\0';
     close(fd);
 
     return buf;
@@ -154,14 +155,14 @@ int handling_capital(const char *word, const char *word_in_dict){
 
 int word_match_in_dict(const char *word, char *dict[], int numb_words){
     int low = 0;
-    int high = numb_words;
+    int high = numb_words - 1;
 
     while(low <= high){
         int mid = low + (high - low) / 2;
 
-        if(handling_capital(word, dict[mid])) return 1;
+        if(strcasecmp(word, dict[mid]) == 0) return 1;
 
-        if(dict[mid] < word)
+        if(strcasecmp(word, dict[mid]) > 0)
             low = mid + 1;
 
         else high = mid - 1;
@@ -237,7 +238,7 @@ int main(int argc, char **argv){
 
     int bytes;
     while((bytes = read(fd, buf, 255)) > 0){
-        buf[bytes - 1] = '\0';
+        buf[bytes] = '\0';
 
         found = word_match_in_dict(buf, dictionary_array, numb_words);
 
