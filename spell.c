@@ -5,9 +5,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#define TOTAL_WORDS 1000000  // this is 1000000 bytes not a 1000000 words 
-#define BUFSIZE 256 
-#define WORDLEN 128          // if dictionary lines exceed wordlen than truncation or buffer overflow will occur
+#define TOTAL_WORDS 100000
+#define BUFSIZE 256
+#define WORDLEN 128
 
 typedef struct{
     char *buf;
@@ -15,8 +15,6 @@ typedef struct{
     int pos;
     int bytes;
 }LINES;
-
-/* line reader logic is here but not used so streaming is not present everything is checked in RAM inefficient*/
 
 void lines_init(LINES *l, int fd){
     l->buf = malloc(BUFSIZE);
@@ -31,8 +29,7 @@ void lines_destroy(LINES *l){
 
 char *lines_next(LINES *l){
     char *line = NULL;
-    int linelen = 0;                    //if lines_next returns NULL it will leave a dangling buffer because free() is in check_words_in_file
-                                        // should be freed on exit or before returning NULL
+    int linelen = 0;
 
     if(l->bytes < 0) return NULL;
 
@@ -80,20 +77,40 @@ char *dictionary(const char *path){
         exit(EXIT_FAILURE);
     }
 
-    char *buf = malloc(TOTAL_WORDS + 1);
+    char *buf = malloc(BUFSIZE);
     if(!buf){
         perror("Error malloc");
         close(fd);
         exit(EXIT_FAILURE);
     }
 
-    int bytes = read(fd, buf, TOTAL_WORDS);
+    int total = 0;
+    int bytes;
+    int size = BUFSIZE;
 
-    if(bytes < 0){
-        perror("Error read");
-        free(buf);
-        close(fd);
-        exit(EXIT_FAILURE);
+    while((bytes = read(fd, buf, BUFSIZE)) > 0){
+        total += bytes;
+
+        if(total >= BUFSIZE - 1){
+            size *= 2;
+            char *temp_buf = realloc(buf, size);
+
+            if(temp_buf < 0){
+                perror("Error realloc");
+                free(temp_buf);
+                exit(EXIT_FAILURE);
+            }
+
+            buf = temp_buf;
+
+        }
+
+        if(bytes < 0){
+            perror("Error read");
+            free(buf);
+            close(fd);
+            exit(EXIT_FAILURE);
+        }
     }
 
     buf[bytes] = '\0';
@@ -104,7 +121,7 @@ char *dictionary(const char *path){
 
 int buff_to_array(char *buf, char *dict[]){
     int numb_words = 0;
-    char *token = strtok(buf, "\n");                //this makes the buffer unsafe for reuse by inserting /0 terminators in it
+    char *token = strtok(buf, "\n");
 
     while(token && numb_words < TOTAL_WORDS){
         dict[numb_words++] = token;
@@ -136,10 +153,18 @@ int handling_capital(const char *word, const char *word_in_dict){
 }
 
 int word_match_in_dict(const char *word, char *dict[], int numb_words){
-    for(int i = 0; i < numb_words; i++){                                    // does linear search through dictionary instead of binary search
-        if(handling_capital(word, dict[i])){
-            return 1;
-        }
+    int low = 0;
+    int high = numb_words;
+
+    while(low <= high){
+        int mid = low + (high - low) / 2;
+
+        if(handling_capital(word, dict[mid])) return 1;
+
+        if(dict[mid] < word)
+            low = mid + 1;
+
+        else high = mid - 1;
     }
     
     return 0;
@@ -160,7 +185,7 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
     int line_number = 1;
 
     while(line = lines_next(&lines)){
-        int col = 1;                            //col is never incremented?
+        int col = 1;
         int i = 0;
         char word[WORDLEN];
 
@@ -185,7 +210,7 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
             }
         }
 
-        free(line);                         //free should be called outside of exit 
+        free(line);
         line_number++;
     }
 
@@ -194,17 +219,17 @@ int check_word_in_file(const char *path, char *dict[], int numb_words){
 }
 
 int main(int argc, char **argv){
-    char *dict = dictionary(argv[1]);                  // need argument validation checking like "argc < 2" otherwise potential segfault
+    char *dict = dictionary(argv[1]);
 
     //printf("Dictionary as buffer:\n%s\n", dict);
 
     char *dictionary_array[TOTAL_WORDS];
     int numb_words = buff_to_array(dict, dictionary_array);
 
-    /*printf("Dictionary as array:\n");
+    printf("Dictionary as array:\n");
     for(int i = 0; i < numb_words; i++){
         printf("%s\n", dictionary_array[i]);
-    }*/
+    }
 
     int fd = STDIN_FILENO;
     char *buf = malloc(256);
