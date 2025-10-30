@@ -272,6 +272,8 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
     return error_count;
 }
 
+
+// Has not been modified for this task
 int main(int argc, char **argv){
     char *dict = dictionary(argv[1]);
 
