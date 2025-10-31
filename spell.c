@@ -270,7 +270,7 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
                     if(strlen(cleaned_word) > 0 && !word_match_in_dict(cleaned_word, dict, numb_words)){
 
                         if(strcmp(path, "/dev/stdin") == 0){
-                            printf("stdin:%d:%d %s\n", line_number, col - i, cleaned_word);
+                            printf("%d:%d %s\n", line_number, col - i, cleaned_word);
                             has_error++;
                         }
                         else{
