@@ -4,10 +4,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define TOTAL_WORDS 100000 // Maximum number of words in dictionary
 #define BUFSIZE 256 // Buffer size for reading files
 #define WORDLEN 128 // Maximum length of a word
+#define PATH_LENGTH 4096 // Maximum path length
 
 //Structure to handle line reading from file descriptor
 typedef struct{
@@ -42,7 +45,6 @@ char *lines_next(LINES *l){
         while(l->pos < l->bytes){
             if(l->buf[l->pos] == '\n'){
                 int seglen = l->pos - segstart;
-                //if (DEBUG) printf("[%d/%d/%d found newline %d+%d]\n", segstart, l->pos, l->bytes, linelen, seglen);
                 line = realloc(line, linelen + seglen + 1);
                 memcpy(line + linelen, l->buf + segstart, seglen);
                 line[linelen + seglen] = '\0';
@@ -56,7 +58,6 @@ char *lines_next(LINES *l){
 
         if (segstart < l->pos) {
             int seglen = l->pos - segstart;
-            //if (DEBUG) printf("[%d/%d/%d extending line %d+%d]\n", segstart, l->pos, l->bytes, linelen, seglen);
             line = realloc(line, linelen + seglen + 1);
             memcpy(line + linelen, l->buf + segstart, seglen);
             linelen = linelen + seglen;
@@ -65,7 +66,6 @@ char *lines_next(LINES *l){
 
         l->pos = 0;
         l->bytes = read(l->fd, l->buf, BUFSIZE);
-        //if (DEBUG) printf("[got %d bytes]\n", l->bytes);
     }while (l->bytes > 0);
 
     l->bytes = -1;
@@ -224,7 +224,7 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
     LINES lines;
     lines_init(&lines, fd);
     char *line;
-    int error_count = 0;
+    int has_error = 0;
     int line_number = 1;
 
     // Read each line from the file
@@ -250,7 +250,7 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
 
                     if(strlen(cleaned_word) > 0 && !word_match_in_dict(cleaned_word, dict, numb_words)){
                         printf("%s:%d:%d %s\n", path, line_number, col - i, cleaned_word);
-                        error_count++;
+                        has_error++;
                     }
 
                     i = 0; // Reset index for next word
@@ -269,44 +269,118 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
     }
 
     lines_destroy(&lines);
-    return error_count;
+    return has_error;
 }
 
+int check_suffix(const char *filename, const char *suffix){
+    int len_filename = strlen(filename);
+    int len_suffix = strlen(suffix);
 
-// Has not been modified for this task
+    // If filename is shorter than suffix, it cannot match
+    if(len_filename < len_suffix){
+        return 0;
+    }
+
+    return strcmp(filename + len_filename - len_suffix, suffix) == 0; // Compare end of filename with suffix
+}
+
+// Function to traverse a directory and check files with a specific suffix
+int directory_traverse(const char *dirpath, const char *suffix, char *dict[], int numb_words){
+    int dir = oppendir(dirpath);
+
+    if(dir < 0){
+        perror("Error open directory");
+        return 1;
+    }
+
+    struct dirent *entry;
+    struct stat file_stat;
+    char file_path[PATH_LENGTH];
+    int has_error = 0;
+
+    // Read each entry in the directory
+    while((entry = readdir(dir)) != NULL){
+        // Skip files starting with a dot (hidden files) or special entries "." and ".."
+        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || entry->d_name[0] == '.'){
+            continue;
+        }
+
+        snprintf(file_path, BUFSIZE, "%s/%s", dirpath, entry->d_name);
+        
+        if(stat(file_path, &file_stat) < 0){
+            perror("Error stat");
+            continue; // Skip this entry on error
+        }
+
+        // If entry is a directory, recursively traverse it
+        if(S_ISDIR(file_stat.st_mode)){
+            has_error += directory_traverse(file_path, suffix, dict, numb_words);
+        }
+
+        // If entry is a regular file with matching suffix, check words in the file
+        else if(S_ISREG(file_stat.st_mode) && check_suffix(entry->d_name, suffix)){
+            has_error += check_words_in_file(file_path, dict, numb_words);
+        }
+    }
+
+    closedir(dir);
+    return has_error;
+}
+
 int main(int argc, char **argv){
-    char *dict = dictionary(argv[1]);
+    if(argc < 2){
+        fprintf(stderr, "Usage: %s <dictionary_file>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
 
-    //printf("Dictionary as buffer:\n%s\n", dict);
+    const char *default_suffix = ".txt"; // Default file suffix
 
+    // Check for optional suffix argument
+    int arg_index = 1;
+    if(argc > 2 && strcmp(argv[1], "-s") == 0){
+        default_suffix = argv[2];
+        arg_index = 3;
+    }
+
+    char *dict = dictionary(argv[arg_index]);
     char *dictionary_array[TOTAL_WORDS];
     int numb_words = buff_to_array(dict, dictionary_array);
 
-    printf("Dictionary as array:\n");
-    for(int i = 0; i < numb_words; i++){
-        printf("%s\n", dictionary_array[i]);
+    int has_error = 0;
+
+    // If no files or directories specified, traverse current directory
+    if(argc <= arg_index + 1){
+        has_error = directory_traverse(".", default_suffix, dictionary_array, numb_words);
     }
 
-    int fd = STDIN_FILENO;
-    char *buf = malloc(256);
-    int found;
+    else{
+        for(int i = arg_index + 1; i < argc; i++){
+            struct stat path_stat;
 
-    int bytes;
-    while((bytes = read(fd, buf, 256)) > 0){
-        buf[bytes - 1] = '\0';
+            if(stat(argv[i], &path_stat) < 0){
+                perror("Error stat");
+                has_error = 1;
+                continue;
+            }
 
-        found = word_match_in_dict(buf, dictionary_array, numb_words);
+            // Check if path is a directory or regular file
+            if(S_ISDIR(path_stat.st_mode)){
+                has_error += directory_traverse(argv[i], default_suffix, dictionary_array, numb_words);
+            }
 
-        if(found){
-            printf("Word found in dictionary.\n");
-        } 
+            // If regular file, check words in the file
+            else if(S_ISREG(path_stat.st_mode)){
+                has_error += check_words_in_file(argv[i], dictionary_array, numb_words);
+            }
 
-        else{
-            printf("Word not found in dictionary.\n");
+            // Skip non-regular files
+            else{
+                fprintf(stderr, "Skipping non-regular file: %s\n", argv[i]);
+            }
         }
     }
-    
-    free(buf);
 
-    return EXIT_SUCCESS;
+    free(dict);
+
+    return has_error ? EXIT_FAILURE : EXIT_SUCCESS;
 }
