@@ -1,8 +1,8 @@
 NAME: Thai Bao Nguyen
 RUID: 249008650
 
-NAME:
-RUID:
+NAME: Zachary Adam
+RUID: 
 
 Design
 ------
@@ -21,3 +21,7 @@ Handling word in file (standard input is treated as a file)
 Handling directory:
     We use a function to handling suffix if user input -s.
     By using recursively for directory traversal, we open it until we find the file name from user's input, if not print out an error message and return, also, a has_error flag.
+
+
+Test Plan:
+
