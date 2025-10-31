@@ -69,6 +69,12 @@ char *lines_next(LINES *l){
         l->bytes = read(l->fd, l->buf, BUFSIZE);
     }while (l->bytes > 0);
 
+    if (linelen > 0){
+        line[linelen] = '\0';
+        l->bytes = -1;
+        return line;
+    }
+    
     l->bytes = -1;
 
     return line;
