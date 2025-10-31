@@ -214,7 +214,18 @@ int word_match_in_dict(const char *word, char *dict[], int numb_words){
 
 //Function to check words in a file if matching word in the dictionary
 int check_words_in_file(const char *path, char *dict[], int numb_words, int fd){
-    int fd = open(path, O_RDONLY);
+    if(strcmp(path, "/dev/stdin") != 0){
+        fd = STDIN_FILENO;
+
+        if(fd < 0){
+            perror("Error open");
+            return 0;
+        }
+    }
+
+    else{
+        fd = open(path, O_RDONLY);
+    }
 
     if(fd < 0){
         perror("Error open");
