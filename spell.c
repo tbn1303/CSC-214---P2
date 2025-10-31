@@ -268,8 +268,15 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
                     cleanup_word(word, cleaned_word);
 
                     if(strlen(cleaned_word) > 0 && !word_match_in_dict(cleaned_word, dict, numb_words)){
-                        printf("%s:%d:%d %s\n", path, line_number, col - i, cleaned_word);
-                        has_error++;
+
+                        if(strcmp(path, "/dev/stdin") == 0){
+                            printf("stdin:%d:%d %s\n", line_number, col - i, cleaned_word);
+                            has_error++;
+                        }
+                        else{
+                            printf("%s:%d:%d %s\n", path, line_number, col - i, cleaned_word);
+                            has_error++;
+                        }
                     }
 
                     i = 0; // Reset index for next word
