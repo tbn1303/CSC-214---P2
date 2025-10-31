@@ -213,7 +213,9 @@ int word_match_in_dict(const char *word, char *dict[], int numb_words){
 }
 
 //Function to check words in a file if matching word in the dictionary
-int check_words_in_file(const char *path, char *dict[], int numb_words, int fd){
+int check_words_in_file(const char *path, char *dict[], int numb_words){
+    int fd;
+
     if(strcmp(path, "/dev/stdin") != 0){
         fd = STDIN_FILENO;
 
@@ -365,7 +367,7 @@ int main(int argc, char **argv){
 
     // If no files or directories specified, traverse current directory
     if(argc <= arg_index + 1){
-        has_error = check_words_in_file("/dev/stdin", dictionary_array, numb_words, STDIN_FILENO);
+        has_error = check_words_in_file("/dev/stdin", dictionary_array, numb_words);
     }
 
     else{
