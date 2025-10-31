@@ -225,13 +225,11 @@ int check_words_in_file(const char *path, char *dict[], int numb_words, int fd){
 
     else{
         fd = open(path, O_RDONLY);
+        if(fd < 0){
+            perror("Error open file");
+            return 0;
+        }
     }
-
-    if(fd < 0){
-        perror("Error open");
-        return 0;
-    }
-
     LINES lines;
     lines_init(&lines, fd);
     char *line;
