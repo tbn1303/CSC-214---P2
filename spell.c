@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -363,6 +364,8 @@ int main(int argc, char **argv){
     char *dict = dictionary(argv[arg_index]);
     char *dictionary_array[TOTAL_WORDS];
     int numb_words = buff_to_array(dict, dictionary_array);
+
+    qsort(dictionary_array, numb_words, sizeof(char *), (int (*)(const void *, const void *))strcasecmp);
 
     int has_error = 0;
 
