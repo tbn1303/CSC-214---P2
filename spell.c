@@ -301,7 +301,7 @@ int check_suffix(const char *filename, const char *suffix){
 int directory_traverse(const char *dirpath, const char *suffix, char *dict[], int numb_words){
     DIR *dir = opendir(dirpath);
 
-    if(dir < 0){
+    if(dir == NULL){
         perror("Error open directory");
         return 1;
     }
