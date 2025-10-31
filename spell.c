@@ -286,7 +286,7 @@ int check_suffix(const char *filename, const char *suffix){
 
 // Function to traverse a directory and check files with a specific suffix
 int directory_traverse(const char *dirpath, const char *suffix, char *dict[], int numb_words){
-    int dir = oppendir(dirpath);
+    DIR *dir = opendir(dirpath);
 
     if(dir < 0){
         perror("Error open directory");
