@@ -213,7 +213,7 @@ int word_match_in_dict(const char *word, char *dict[], int numb_words){
 }
 
 //Function to check words in a file if matching word in the dictionary
-int check_words_in_file(const char *path, char *dict[], int numb_words){
+int check_words_in_file(const char *path, char *dict[], int numb_words, int fd){
     int fd = open(path, O_RDONLY);
 
     if(fd < 0){
@@ -237,7 +237,7 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
         for(int pos = 0; ; pos++){
             char c = line[pos];
 
-            if(isalpha(c) || c == '_' || c == '-' ){
+            if(isalpha(c) || c == '_' || c == '-' || isdigit(c) || c == '\''){
                 if(i < WORDLEN - 1){
                     word[i++] = c; // Add character to current word then increment index
                 }
@@ -305,7 +305,7 @@ int directory_traverse(const char *dirpath, const char *suffix, char *dict[], in
             continue;
         }
 
-        snprintf(file_path, BUFSIZE, "%s/%s", dirpath, entry->d_name);
+        snprintf(file_path, PATH_LENGTH, "%s/%s", dirpath, entry->d_name);
         
         if(stat(file_path, &file_stat) < 0){
             perror("Error stat");
@@ -340,6 +340,12 @@ int main(int argc, char **argv){
     if(argc > 2 && strcmp(argv[1], "-s") == 0){
         default_suffix = argv[2];
         arg_index = 3;
+
+        // Ensure dictionary file is provided after suffix
+        if(argc < 4){
+            fprintf(stderr, "Usage: %s [-s suffix] <dictionary_file>\n", argv[0]);
+            return EXIT_FAILURE;
+        }
     }
 
     char *dict = dictionary(argv[arg_index]);
@@ -350,7 +356,7 @@ int main(int argc, char **argv){
 
     // If no files or directories specified, traverse current directory
     if(argc <= arg_index + 1){
-        has_error = directory_traverse(".", default_suffix, dictionary_array, numb_words);
+        has_error = check_words_in_file("/dev/stdin", dictionary_array, numb_words, STDIN_FILENO);
     }
 
     else{
