@@ -346,6 +346,10 @@ int directory_traverse(const char *dirpath, const char *suffix, char *dict[], in
     return has_error;
 }
 
+static int dict_cmp(const void *a, const void *b){
+    return strcasecmp(*(const char **)a, *(const char **)b);
+}
+
 int main(int argc, char **argv){
     if(argc < 2){
         fprintf(stderr, "Usage: %s <dictionary_file>\n", argv[0]);
@@ -371,7 +375,8 @@ int main(int argc, char **argv){
     char *dictionary_array[TOTAL_WORDS];
     int numb_words = buff_to_array(dict, dictionary_array);
 
-    qsort(dictionary_array, numb_words, sizeof(char *), (int (*)(const void *, const void *))strcasecmp);
+    qsort(dictionary_array, numb_words, sizeof(char *), (int (*)(const void *, const void *))dict_cmp);
+   
 
     int has_error = 0;
 
