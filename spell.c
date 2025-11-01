@@ -247,7 +247,7 @@ int check_words_in_file(const char *path, char *dict[], int numb_words){
     int line_number = 1;
 
     // Read each line from the file
-    while(line = lines_next(&lines)){
+    while((line = lines_next(&lines))){
         int col = 1;
         int i = 0;
         char word[WORDLEN]; // Buffer to store the current word
