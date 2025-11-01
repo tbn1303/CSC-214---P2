@@ -1,0 +1,1 @@
+This is a test of whether the program will scan specific files in the directory given the s flag. 

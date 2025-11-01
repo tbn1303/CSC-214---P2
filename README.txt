@@ -65,8 +65,70 @@ the output should be:
 
 1:17 bar
 
-Thus satisfying the capitalization requirement that the capitalization in the dictionary must be matched, but lower-case letters in the dictionary can be matched
-with either upper or lowercase letters in the input.
+Thus satisfying the capitalization requirement that the capitalization in the dictionary must be matched, but lower-case letters in the 
+dictionary can be matched with either upper or lowercase letters in the input.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Test 3
+Test: Verifying punctuation
+
+to verify that the leading and trailing punctuation of a word is properly trimmed off for the word to be read, I tested using the same dict file 
+with the word "academic" for example, and just included punctuation. The word should still be read correctly even given leading and trailing punctuation for example:
+
+./spell dict 
+[{!@.academic}]
+
+should not return anything because the word aside from the trailing and leading punctuation is still correctly spelled. Whereas an incorrect 
+spelling with punctuation would look like:
+
+./spell dict
+[{!@.academicc}]
+
+should output:
+
+1:6 academicc
+
+as the word is spelled incorrectly to the dictionary, but the punctuations are still trimmed off of it, 
+and still able to track the correct column number of the word.
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Test: Verifying the program can scan directories for text files as well as the optional flag for extensions
+
+To make sure the program adequately scans directories we tested using an example directory called "quux" inside the P2 directory where the spell program is 
+and inside of the quux directory is two files: "dirtest.txt" and "extensiontest.md" which purposefully both have different file extensions. 
+
+if we wanted to scan the directory quux for .txt files by using the absence of the optional argument flag we would run
+
+./spell dict quux
+
+which should scan the quux directory looking for .txt extension files only and ignore the .md file. All incorrect word outputs should only come from "dirtest.txt"
+and the output of our program correctly does this ignoring the "extensiontest.md" file, both testing our program for scanning directories and testing the default
+optional flag absence of .txt files. In our specific case testing with the dict file should output:
+
+quux/dirtest.txt:1:1 This
+quux/dirtest.txt:1:6 is
+quux/dirtest.txt:1:11 test
+quux/dirtest.txt:1:16 of
+quux/dirtest.txt:1:19 scanning
+quux/dirtest.txt:1:28 directories
+
+as every single word in the "dirtest.txt" file is incorrectly spelled, so every word should be printed but NO words from "extensiontest.md" should be printed.
+
+If we wanted to scan the quux directory for .md files then we should run:
+
+./spell -s .md dict quux
+
+In this case the output should only contain incorrectly spelled words (that do not match our test file "dict") from the "extensiontest.md" file and NOT the
+"dirtest.txt" file since "extensiontest.md" is the only .md file in the quux directory. and the output should be: 
+
+quux/dirtest.txt:1:1 This
+quux/dirtest.txt:1:6 is
+quux/dirtest.txt:1:11 test
+quux/dirtest.txt:1:16 of
+quux/dirtest.txt:1:19 scanning
+quux/dirtest.txt:1:28 directories
+
+as every word in the "extensiontest.md" file is spelled incorrectly (compared to the test dict file we have) and NO words from "dirtest.txt" should be printed.
+
+This test verifies the ability of our program to scan a directory and read files as well as scan a directory specifically for a certain file extension. 
+
