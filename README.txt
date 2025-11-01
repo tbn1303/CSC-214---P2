@@ -25,12 +25,14 @@ Handling directory:
     By using recursively for directory traversal, we open it until we find the file name from user's input, if not print out an error 
     message and return, also, a has_error flag.
 
-
+----------------------------------------------------------------------------------------------------------------------------------------------------------
 Test Plan:
+----------
 
-Test 1: verifying standard input works as well as the rows and columns
+Test: verifying standard input works as well as the rows and columns
 
-The dictionary file we tested here included some words such as "abandon" and "academic", so testing the standard input would include commands like:
+The dictionary file we tested here included some words such as "abandon" and "academic", so testing the standard input would include 
+commands like:
 
 ./spell dict 
 abandon academic 
@@ -45,11 +47,26 @@ the output should be:
 
 2:1 abandonn 
 
-as this is the second line of input and the mispelled word ("abandonn" in this case) is output by the program for starting at the second line first column
-while academic is not printed because it is still spelled correctly
+as this is the second line of input and the mispelled word ("abandonn" in this case) is output by the program for starting at the 
+second line first column while academic is not printed because it is still spelled correctly. This also checks that standard input is accepted in the
+abscence of a second argument.
 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+Test: Verifying Capitalization rules using standard input
 
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+To verify the capitalization rules are met I tested the exact example used in the spec: if the dictionary contains "foo" and "Bar" then inputting the
+words "Foo", "fOO", "BAr", "BAR", and "bar", then the only word it should not accept is "bar". 
 
-Test 2: Verifying
+./spell dict
+Foo fOO BAr BAR bar
+
+the output should be:
+
+1:17 bar
+
+Thus satisfying the capitalization requirement that the capitalization in the dictionary must be matched, but lower-case letters in the dictionary can be matched
+with either upper or lowercase letters in the input.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Test 3
